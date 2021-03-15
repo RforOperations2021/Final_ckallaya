@@ -24,7 +24,7 @@ loadlibs(libs)
 # NAICS: 113, 1142, 1153, 321, 322 (These are what we consider forest industries)
 # The file is saved as forest_employment.csv which contains both earnings (pay) and employment (employee)
 
-employ <- read.csv("forest_employment.csv")
+employ <- read.csv("./forest_employment.csv")
 
 #---------------------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ employ <- read.csv("forest_employment.csv")
 
 #---------------------------------------------------------------------------------
 
-total <- read.csv("total_employment.csv")
+total <- read.csv("./total_employment.csv")
 
 # Since the datasets do not provide fips so we have to create fips by ourselves
 # Create fips for forest_employment
@@ -77,8 +77,8 @@ write.csv(pct_employ,'pct_employ.csv')
 # Download from https://data.census.gov/cedsci/advanced
 # Topic: Race and Ethnicity > American Indian and Alaska Native, Native Hawaiian and Pacific Islander
 # The file is saved as indigenous.csv. The used column is named 'native'.
-indigenous <- read.csv("indigenous.csv")   # use this one instead
-pop <- read.csv("pop.csv")
+indigenous <- read.csv("./indigenous.csv")   # use this one instead
+pop <- read.csv("./pop.csv")
 
 # Create fips for indigenous data
 fips_indigenous <- c()
@@ -112,16 +112,16 @@ write.csv(merged_native,'merged_native.csv')
 # The datasets provide fips
 # Note that data from FIA for forest cover are based on inventories for the years 2014-2019.
 
-forest <- read.csv("pct_forest.csv")
+forest <- read.csv("./pct_forest.csv")
 forest <- data.frame(county = forest[,2], state = forest[,1], fips = forest[,5], forest.area = forest[,6], land.water = forest[,7], pct.forest = forest[,8], year = forest[,9])
 
 # Write data frame into a .csv file
 write.csv(forest,'forest.csv')
 
 # Read all csv files we created
-merged_native <- read.csv("merged_native.csv")
-forest <- read.csv("forest.csv")
-employ <- read.csv("pct_employ.csv")
+merged_native <- read.csv("./merged_native.csv")
+forest <- read.csv("./forest.csv")
+employ <- read.csv("./pct_employ.csv")
 
 # Merge indigenous data with forest land data
 native.forest <- merge(merged_native,forest,by=c('fips'),all.x=T)
@@ -134,7 +134,7 @@ native.forest.employ[is.na(native.forest.employ)] <- 0
 # write the data frame into a csv file
 write.csv(native.forest.employ,'final.merged.csv')
 
-final.merged <- read.csv("final.merged.csv")
+final.merged <- read.csv("./final.merged.csv")
 
 #---------------------------------------------------------------------------------
 
@@ -143,7 +143,7 @@ final.merged <- read.csv("final.merged.csv")
 # Download from https://www.ers.usda.gov/data-products/rural-urban-continuum-codes.aspx#.UYJuVEpZRvY
 # Topic: Metro vs Non-Metro
 # The file is saved as employment.ratio.csv. We use column 'Nonmetro'.
-rural <- read.csv("rural.csv")
+rural <- read.csv("./rural.csv")
 
 rural <- data.frame(fips = rural[,1], county = rural[,3], state = rural[,2], pop.2010 = rural[,4], rucc.2013 = rural[,5], nonmetro = rural[,7], rural = rural[,8])
 
@@ -159,7 +159,9 @@ final.merged.rural <- final.merged.rural %>% dplyr::rename(county=county.x, stat
 # Rearrange columns
 final.merged.rural <- final.merged.rural[c("fips", "state", "county", "pct.forest", "pct.employees", "pct.earnings", "pct.indigenous", "nonmetro", "rural")]
 
+write.csv(final.merged.rural,'final.merged.rural.csv')
 
+final.merged.rural <- read.csv("./final.merged.rural.csv")
 #---------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------
 
@@ -235,52 +237,33 @@ ui <- fluidPage(
             
             # Show all the plots --------------------------------------------
             
-            plotOutput(outputId = "forest.dependent.map"),
-            br(),        
-            
-            # Print number of obs plotted ---------------------------------
-            uiOutput(outputId = "text1"),
-            br(), br(),    # a little bit of visual separation
-            
-            plotOutput(outputId = "criteria.map"),
-            br(),
-            
-            # Print number of obs plotted ---------------------------------
-            uiOutput(outputId = "text2"),
-            br(), br(),    # a little bit of visual separation
-            
-            # Show data table ---------------------------------------------
-            DT::dataTableOutput(outputId = "datatable1"),
+            # plotOutput(outputId = "forest.dependent.map"),
+            # br(),        
+            # 
+            # # Print number of obs plotted ---------------------------------
+            # uiOutput(outputId = "text1"),
+            # br(), br(),    # a little bit of visual separation
+            # 
+            # plotOutput(outputId = "criteria.map"),
+            # br(),
+            # 
+            # # Print number of obs plotted ---------------------------------
+            # uiOutput(outputId = "text2"),
+            # br(), br(),    # a little bit of visual separation
+            # 
+            # # Show data table ---------------------------------------------
+            # DT::dataTableOutput(outputId = "datatable1"),
             
             # Show download button ---------------------------------------------
             downloadButton("download1","Download data table as csv"),
             # Show data table ---------------------------------------------
             DT::dataTableOutput(outputId = "datatable2")
         )
-    ),
-    
-    # Show links to the data sources
-    mainPanel(
-        HTML(
-            paste(
-                h5("Data Sources:"),
-                a(href = "https://xxxxxxxx.com/", "xxxxxxxxxxxx"),  # can put this in ui or renderui only
-                br(),
-                a(href = "https://xxxxxxxx.com/", "xxxxxxxxxxxx")  # can put this in ui or renderui only
-            )
-        )
     )
-    
 )
 
 # Define server function required to create the plots ---------
 server <- function(input, output, session) {
-    
-    
-    # Convert plot_title toTitleCase ----------------------------------
-    # pretty_plot_title1 <- reactive({ toTitleCase(input$plot_title1) })
-    # pretty_plot_title2 <- reactive({ toTitleCase(input$plot_title2) })
-    # pretty_plot_title3 <- reactive({ toTitleCase(input$plot_title3) })
     
     # Prompt users to key thresholds ------
     # Forest land
@@ -327,7 +310,7 @@ server <- function(input, output, session) {
                            max = 100
         )
     })
-    #Create new df that is n_samp obs from selected type movies ------
+
     
     forest.dependent <- reactive({
         ifelse(final.merged.rural$pct.forest > input$forest_land1 |
@@ -356,293 +339,287 @@ server <- function(input, output, session) {
     })
     
     #Assign 3 categories: Forest-dependent counties (1), Non-metro, non-forest counties (2), and Metro, non-forest counties (3).
-    category <- reactiveValues()
-    observe({
-        for (i in 1:length(df()[,1]))
-            if (is.na(forest.dependent()[i]) | is.na(other.rural()[i])){
-                category$cat[i] <- 3
-            }
-        else if (forest.dependent()[i] == 1){
-            category$cat[i] <- 1
-        } else if (other.rural()[i] == 1) {
-            category$cat[i] <- 2
-        } else {
-            category$cat[i] <- 3
-        }
-    })
-    
-    cat_recode <- reactive({
-        recode_factor(category$cat,
-                      `1` = "FDC",
-                      `2` = "NMNFDC",
-                      `3` = "MNFDC")
-    })
-    
-    forest.dependent_recode <- reactive({
-        recode_factor(forest.dependent(),
-                      `1` = "FDC",
-                      `0` = "NFDC")
-    })
-    
-    newdf <- reactive({
-        cbind(
-            final.merged.rural[,!(names(final.merged.rural) %in% c("nonmetro", "rural"))],
-            forest.dependent_recode(),
-            cat_recode()
-        )
-    })  
-    
-    
-    forest.dependent.sum <- reactive({
-        sum(cat_recode() == "FDC")
-    })
-    
-    nmnfdc.sum <- reactive({
-        sum(cat_recode() == "NMNFDC")
-    })  
-    
-    mnfdc.sum <- reactive({
-        sum(cat_recode() == "MNFDC")
-    }) 
-    
-    total <- reactive({
-        forest.dependent.sum()+nmnfdc.sum()+mnfdc.sum()
-    }) 
-    
-    #-----------------------------------------------------------------------------------
-    forest.first <- reactive({
-        ifelse(final.merged.rural$pct.forest > input$forest_land1, 1, 0)
-    })
-    
-    forest.second <- reactive({
-        ifelse(final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings, 1, 0)
-    })
-    
-    forest.third <- reactive({
-        ifelse(final.merged.rural$pct.forest > input$forest_land2 & final.merged.rural$pct.indigenous > input$indigenous, 1, 0)
-    })
-    
-    forest.first.second <- reactive({
-        ifelse(final.merged.rural$pct.forest > input$forest_land1 & (final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings), 1, 0)
-    })
-    
-    forest.first.third <- reactive({
-        ifelse(final.merged.rural$pct.forest > input$forest_land1 & (final.merged.rural$pct.forest > input$forest_land2 & final.merged.rural$pct.indigenous > input$indigenous), 1, 0)
-    })
-    
-    forest.second.third <- reactive({
-        ifelse((final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings) & (final.merged.rural$pct.forest > input$forest_land2 & final.merged$pct.indigenous > input$indigenous), 1, 0)
-    })
-    
-    forest.second.third <- reactive({
-        ifelse((final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings) & (final.merged.rural$pct.forest > input$forest_land2 & final.merged$pct.indigenous > input$indigenous), 1, 0)
-    })  
-    
-    forest.second.third <- reactive({
-        ifelse((final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings) & (final.merged.rural$pct.forest > input$forest_land2 & final.merged$pct.indigenous > input$indigenous), 1, 0)
-    })
-    
-    forest.only.first <- reactive({
-        ifelse(forest.first() == 1 & forest.second() == 0 & forest.third() == 0, 1, 0)
-    })
-    
-    forest.only.second <- reactive({
-        ifelse(forest.first() == 0 & forest.second() == 1 & forest.third() == 0, 1, 0)
-    })
-    
-    forest.only.third <- reactive({
-        ifelse(forest.first() == 0 & forest.second() == 0 & forest.third() == 1, 1, 0)
-    })  
-    
-    forest.both.first.second <- reactive({
-        ifelse(forest.first() == 1 & forest.second() == 1 & forest.third() == 0, 1, 0)
-    }) 
-    
-    forest.both.first.third <- reactive({
-        ifelse(forest.first() == 1 & forest.second() == 0 & forest.third() == 1, 1, 0)
-    }) 
-    
-    forest.both.second.third <- reactive({
-        ifelse(forest.first() == 0 & forest.second() == 1 & forest.third() == 1, 1, 0)
-    }) 
-    
-    forest.all.three <- reactive({
-        ifelse(forest.first() == 1 & forest.second() == 1 & forest.third() == 1, 1, 0)
-    })
-    
-    newdf_criteria <- reactive({
-        cbind(
-            newdf(),
-            forest.only.first(),
-            forest.only.second(),
-            forest.only.third(),
-            forest.both.first.second(),
-            forest.both.first.third(),
-            forest.both.second.third(),
-            forest.all.three()
-        )
-    })
-    
-    #Assign criteria categories
-    criteria <- reactiveValues()
-    observe({
-        for (i in 1:length(newdf_criteria()[,1]))
-            if (is.na(forest.dependent()[i]) | is.na(other.rural()[i])){
-                criteria$cri[i] <- 0
-            }
-        else if (forest.only.first()[i] == 1){
-            criteria$cri[i] <- 1
-        } else if (forest.only.second()[i] == 1) {
-            criteria$cri[i] <- 2
-        } else if (forest.only.third()[i] == 1) {
-            criteria$cri[i] <- 3
-        } else if (forest.both.first.second()[i] == 1) {
-            criteria$cri[i] <- 4
-        } else if (forest.both.first.third()[i] == 1) {
-            criteria$cri[i] <- 5
-        } else if (forest.both.second.third()[i] == 1) {
-            criteria$cri[i] <- 6
-        } else if (forest.all.three()[i] == 1) {
-            criteria$cri[i] <- 7
-        } else {
-            criteria$cri[i] <- 0
-        }
-    })
-    
-    criteria_recode <- reactive({
-        recode_factor(criteria$cri,
-                      `1` = "Met criteria: 1",
-                      `2` = "Met criteria: 2",
-                      `3` = "Met criteria: 3",
-                      `4` = "Met criteria: 1,2",
-                      `5` = "Met criteria: 1,3",
-                      `6` = "Met criteria: 2,3",
-                      `7` = "Met criteria: 1,2,3",
-                      `0` = "Met criteria: None")
-    })
-    
-    newdf_criteria_recode <- reactive({
-        cbind(
-            newdf_criteria(),
-            criteria_recode()
-        )
-    })
-    
-    first.criteria <- reactive({
-        sum(criteria_recode() == "Met criteria: 1")
-    })
-    
-    second.criteria <- reactive({
-        sum(criteria_recode() == "Met criteria: 2")
-    })
-    
-    
-    third.criteria <- reactive({
-        sum(criteria_recode() == "Met criteria: 3")
-    })
-    
-    
-    first.second.criteria <- reactive({
-        sum(criteria_recode() == "Met criteria: 1,2")
-    })
-    
-    
-    first.third.criteria <- reactive({
-        sum(criteria_recode() == "Met criteria: 1,3")
-    })
-    
-    
-    second.third.criteria <- reactive({
-        sum(criteria_recode() == "Met criteria: 2,3")
-    })
-    
-    
-    all.criteria <- reactive({
-        sum(criteria_recode() == "Met criteria: 1,2,3")
-    })
-    
-    
-    none.criteria <- reactive({
-        sum(criteria_recode() == "Met criteria: None")
-    })
-    
-    
-    total.criteria <- reactive({
-        first.criteria()+second.criteria()+third.criteria()+first.second.criteria()+first.third.criteria()+second.third.criteria()+all.criteria()+none.criteria()
-    })
-    
-    criteria.tbl <- reactive({
-        data.frame("Criteria" = c("Only First Criteria", "Only Second Criteria", "Only Third Criteria", 
-                                  "Both First & Second Criteria", "Both First & Third Criteria", 
-                                  "Both Second & Third Criteria", "All Criteria", 
-                                  "Total Non-Forest Dependent Counties", 
-                                  "Total Counties"), "Counties" 
-                   = c(first.criteria(), second.criteria(), third.criteria(), first.second.criteria(), 
-                       first.third.criteria(), second.third.criteria(), all.criteria(), 
-                       none.criteria(), total.criteria()))
-    })
+    # category <- reactiveValues()
+    # observe({
+    #     for (i in 1:length(df()[,1]))
+    #         if (is.na(forest.dependent()[i]) | is.na(other.rural()[i])){
+    #             category$cat[i] <- 3
+    #         }
+    #     else if (forest.dependent()[i] == 1){
+    #         category$cat[i] <- 1
+    #     } else if (other.rural()[i] == 1) {
+    #         category$cat[i] <- 2
+    #     } else {
+    #         category$cat[i] <- 3
+    #     }
+    # })
+    # 
+    # cat_recode <- reactive({
+    #     recode_factor(category$cat,
+    #                   `1` = "FDC",
+    #                   `2` = "NMNFDC",
+    #                   `3` = "MNFDC")
+    # })
+    # 
+    # forest.dependent_recode <- reactive({
+    #     recode_factor(forest.dependent(),
+    #                   `1` = "FDC",
+    #                   `0` = "NFDC")
+    # })
+    # 
+    # newdf <- reactive({
+    #     cbind(
+    #         final.merged.rural[,!(names(final.merged.rural) %in% c("nonmetro", "rural"))],
+    #         forest.dependent_recode(),
+    #         cat_recode()
+    #     )
+    # })  
+    # 
+    # 
+    # forest.dependent.sum <- reactive({
+    #     sum(cat_recode() == "FDC")
+    # })
+    # 
+    # nmnfdc.sum <- reactive({
+    #     sum(cat_recode() == "NMNFDC")
+    # })  
+    # 
+    # mnfdc.sum <- reactive({
+    #     sum(cat_recode() == "MNFDC")
+    # }) 
+    # 
+    # total <- reactive({
+    #     forest.dependent.sum()+nmnfdc.sum()+mnfdc.sum()
+    # }) 
+    # 
+    # #-----------------------------------------------------------------------------------
+    # forest.first <- reactive({
+    #     ifelse(final.merged.rural$pct.forest > input$forest_land1, 1, 0)
+    # })
+    # 
+    # forest.second <- reactive({
+    #     ifelse(final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings, 1, 0)
+    # })
+    # 
+    # forest.third <- reactive({
+    #     ifelse(final.merged.rural$pct.forest > input$forest_land2 & final.merged.rural$pct.indigenous > input$indigenous, 1, 0)
+    # })
+    # 
+    # forest.first.second <- reactive({
+    #     ifelse(final.merged.rural$pct.forest > input$forest_land1 & (final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings), 1, 0)
+    # })
+    # 
+    # forest.first.third <- reactive({
+    #     ifelse(final.merged.rural$pct.forest > input$forest_land1 & (final.merged.rural$pct.forest > input$forest_land2 & final.merged.rural$pct.indigenous > input$indigenous), 1, 0)
+    # })
+    # 
+    # forest.second.third <- reactive({
+    #     ifelse((final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings) & (final.merged.rural$pct.forest > input$forest_land2 & final.merged$pct.indigenous > input$indigenous), 1, 0)
+    # })
+    # 
+    # forest.only.first <- reactive({
+    #     ifelse(forest.first() == 1 & forest.second() == 0 & forest.third() == 0, 1, 0)
+    # })
+    # 
+    # forest.only.second <- reactive({
+    #     ifelse(forest.first() == 0 & forest.second() == 1 & forest.third() == 0, 1, 0)
+    # })
+    # 
+    # forest.only.third <- reactive({
+    #     ifelse(forest.first() == 0 & forest.second() == 0 & forest.third() == 1, 1, 0)
+    # })  
+    # 
+    # forest.both.first.second <- reactive({
+    #     ifelse(forest.first() == 1 & forest.second() == 1 & forest.third() == 0, 1, 0)
+    # }) 
+    # 
+    # forest.both.first.third <- reactive({
+    #     ifelse(forest.first() == 1 & forest.second() == 0 & forest.third() == 1, 1, 0)
+    # }) 
+    # 
+    # forest.both.second.third <- reactive({
+    #     ifelse(forest.first() == 0 & forest.second() == 1 & forest.third() == 1, 1, 0)
+    # }) 
+    # 
+    # forest.all.three <- reactive({
+    #     ifelse(forest.first() == 1 & forest.second() == 1 & forest.third() == 1, 1, 0)
+    # })
+    # 
+    # newdf_criteria <- reactive({
+    #     cbind(
+    #         newdf(),
+    #         forest.only.first(),
+    #         forest.only.second(),
+    #         forest.only.third(),
+    #         forest.both.first.second(),
+    #         forest.both.first.third(),
+    #         forest.both.second.third(),
+    #         forest.all.three()
+    #     )
+    # })
+    # 
+    # #Assign criteria categories
+    # criteria <- reactiveValues()
+    # observeEvent( eventExpr = df(),
+    #          handlerExpr = {
+    #     for (i in 1:length(newdf_criteria()[,1]))
+    #         if (is.na(forest.dependent()[i]) | is.na(other.rural()[i])){
+    #             criteria$cri[i] <- 0
+    #         }
+    #     else if (forest.only.first()[i] == 1){
+    #         criteria$cri[i] <- 1
+    #     } else if (forest.only.second()[i] == 1) {
+    #         criteria$cri[i] <- 2
+    #     } else if (forest.only.third()[i] == 1) {
+    #         criteria$cri[i] <- 3
+    #     } else if (forest.both.first.second()[i] == 1) {
+    #         criteria$cri[i] <- 4
+    #     } else if (forest.both.first.third()[i] == 1) {
+    #         criteria$cri[i] <- 5
+    #     } else if (forest.both.second.third()[i] == 1) {
+    #         criteria$cri[i] <- 6
+    #     } else if (forest.all.three()[i] == 1) {
+    #         criteria$cri[i] <- 7
+    #     } else {
+    #         criteria$cri[i] <- 0
+    #     }
+    #   }
+    # )
+    # 
+    # criteria_recode <- reactive({
+    #     recode_factor(criteria$cri,
+    #                   `1` = "Met criteria: 1",
+    #                   `2` = "Met criteria: 2",
+    #                   `3` = "Met criteria: 3",
+    #                   `4` = "Met criteria: 1,2",
+    #                   `5` = "Met criteria: 1,3",
+    #                   `6` = "Met criteria: 2,3",
+    #                   `7` = "Met criteria: 1,2,3",
+    #                   `0` = "Met criteria: None")
+    # })
+    # 
+    # newdf_criteria_recode <- reactive({
+    #     cbind(
+    #         newdf_criteria(),
+    #         criteria_recode()
+    #     )
+    # })
+    # 
+    # first.criteria <- reactive({
+    #     sum(criteria_recode() == "Met criteria: 1")
+    # })
+    # 
+    # second.criteria <- reactive({
+    #     sum(criteria_recode() == "Met criteria: 2")
+    # })
+    # 
+    # 
+    # third.criteria <- reactive({
+    #     sum(criteria_recode() == "Met criteria: 3")
+    # })
+    # 
+    # 
+    # first.second.criteria <- reactive({
+    #     sum(criteria_recode() == "Met criteria: 1,2")
+    # })
+    # 
+    # 
+    # first.third.criteria <- reactive({
+    #     sum(criteria_recode() == "Met criteria: 1,3")
+    # })
+    # 
+    # 
+    # second.third.criteria <- reactive({
+    #     sum(criteria_recode() == "Met criteria: 2,3")
+    # })
+    # 
+    # 
+    # all.criteria <- reactive({
+    #     sum(criteria_recode() == "Met criteria: 1,2,3")
+    # })
+    # 
+    # 
+    # none.criteria <- reactive({
+    #     sum(criteria_recode() == "Met criteria: None")
+    # })
+    # 
+    # 
+    # total.criteria <- reactive({
+    #     first.criteria()+second.criteria()+third.criteria()+first.second.criteria()+first.third.criteria()+second.third.criteria()+all.criteria()+none.criteria()
+    # })
+    # 
+    # criteria.tbl <- reactive({
+    #     data.frame("Criteria" = c("Only First Criteria", "Only Second Criteria", "Only Third Criteria", 
+    #                               "Both First & Second Criteria", "Both First & Third Criteria", 
+    #                               "Both Second & Third Criteria", "All Criteria", 
+    #                               "Total Non-Forest Dependent Counties", 
+    #                               "Total Counties"), "Counties" 
+    #                = c(first.criteria(), second.criteria(), third.criteria(), first.second.criteria(), 
+    #                    first.third.criteria(), second.third.criteria(), all.criteria(), 
+    #                    none.criteria(), total.criteria()))
+    # })
     
     # Print number of different types of counties  ----------------------------------
-    output$text1 <- renderUI({
-        
-        HTML(paste("Figure 1 shows the counties identified as forest-dependent using the criteria in box 1 and 2018 data. 
-               There are ", forest.dependent.sum(), "counties (", round(forest.dependent.sum()/total()*100,0)," percent ) that are categorized as forest-dependent. For comparison purposes, we grouped the remaining counties into metro,
-  non-forest-dependent (", nmnfdc.sum(), "counties,", round(nmnfdc.sum()/total()*100,0), " percent ) and non-metro,
-               non-forest-dependent (", mnfdc.sum(), "counties,", round(mnfdc.sum()/total()*100,0), " percent ) counties.
-               Forest-dependent counties include both metro and non-metro counties."))
-    })
-    
+  #   output$text1 <- renderUI({
+  #       
+  #       HTML(paste("Figure 1 shows the counties identified as forest-dependent using the criteria in box 1 and 2018 data. 
+  #              There are ", forest.dependent.sum(), "counties (", round(forest.dependent.sum()/total()*100,0)," percent ) that are categorized as forest-dependent. For comparison purposes, we grouped the remaining counties into metro,
+  # non-forest-dependent (", nmnfdc.sum(), "counties,", round(nmnfdc.sum()/total()*100,0), " percent ) and non-metro,
+  #              non-forest-dependent (", mnfdc.sum(), "counties,", round(mnfdc.sum()/total()*100,0), " percent ) counties.
+  #              Forest-dependent counties include both metro and non-metro counties."))
+  #   })
+  #   
     
     # Create plot objects, the plotOutput function is expecting --
     
     # Create a map showing forest-dependent counties
-    states <- usmap::plot_usmap("states", color = "darkgreen", fill = alpha(0.01)) #this parameter is necessary to get counties to show on top of states
-    counties <- reactive(usmap::plot_usmap(data = newdf(), values = "forest.dependent_recode()", color = "grey"))
-    
-    
-    output$forest.dependent.map <- renderPlot({
-        ggplot()+
-            counties()$layers[[1]]+  #counties needs to be on top of states for this to work
-            states$layers[[1]]+
-            counties()$theme +
-            coord_equal() +
-            scale_fill_manual(values = c(`NFDC`="white", `FDC`="forestgreen"), name = "Community Type") +
-            theme(legend.position = "bottom", panel.background = element_rect(colour = "black"))
-        
-    })
+    # states <- usmap::plot_usmap("states", color = "darkgreen", fill = alpha(0.01)) #this parameter is necessary to get counties to show on top of states
+    # counties <- reactive(usmap::plot_usmap(data = newdf(), values = "forest.dependent_recode()", color = "grey"))
+    # 
+    # 
+    # output$forest.dependent.map <- renderPlot({
+    #     ggplot()+
+    #         counties()$layers[[1]]+  #counties needs to be on top of states for this to work
+    #         states$layers[[1]]+
+    #         counties()$theme +
+    #         coord_equal() +
+    #         scale_fill_manual(values = c(`NFDC`="white", `FDC`="forestgreen"), name = "Community Type") +
+    #         theme(legend.position = "bottom", panel.background = element_rect(colour = "black"))
+    #     
+    # })
     
     # Create a map showing forest-dependent counties under different criteria
-    counties_criteria <- reactive(usmap::plot_usmap(data = newdf_criteria_recode(), values = "criteria_recode()", color = "grey"))
-    
-    output$criteria.map <- renderPlot({
-        ggplot()+
-            counties_criteria()$layers[[1]]+  #counties needs to be on top of states for this to work
-            states$layers[[1]]+
-            counties_criteria()$theme +
-            coord_equal() +
-            scale_fill_manual(values =
-                                  c(`Met criteria: None` = "white",
-                                    `Met criteria: 1` = "gold",
-                                    `Met criteria: 2` = "mediumpurple",
-                                    `Met criteria: 3` = "salmon",
-                                    `Met criteria: 1,2` = "turquoise",
-                                    `Met criteria: 1,3` = "firebrick",
-                                    `Met criteria: 2,3` = "cornflowerblue",
-                                    `Met criteria: 1,2,3` = "forestgreen"),
-                              name = "Community Type") +
-            theme(legend.position = "bottom", panel.background = element_rect(colour = "black"))
-    })
+    # counties_criteria <- reactive(usmap::plot_usmap(data = newdf_criteria_recode(), values = "criteria_recode()", color = "grey"))
+    # 
+    # output$criteria.map <- renderPlot({
+    #     ggplot()+
+    #         counties_criteria()$layers[[1]]+  #counties needs to be on top of states for this to work
+    #         states$layers[[1]]+
+    #         counties_criteria()$theme +
+    #         coord_equal() +
+    #         scale_fill_manual(values =
+    #                               c(`Met criteria: None` = "white",
+    #                                 `Met criteria: 1` = "gold",
+    #                                 `Met criteria: 2` = "mediumpurple",
+    #                                 `Met criteria: 3` = "salmon",
+    #                                 `Met criteria: 1,2` = "turquoise",
+    #                                 `Met criteria: 1,3` = "firebrick",
+    #                                 `Met criteria: 2,3` = "cornflowerblue",
+    #                                 `Met criteria: 1,2,3` = "forestgreen"),
+    #                           name = "Community Type") +
+    #         theme(legend.position = "bottom", panel.background = element_rect(colour = "black"))
+    # })
     
     # Print data table if checked -------------------------------------
-    output$datatable1 <- DT::renderDataTable(
-        DT::datatable(data = criteria.tbl(),
-                      rownames = FALSE)
-    )
+    # output$datatable1 <- DT::renderDataTable(
+    #     DT::datatable(data = criteria.tbl(),
+    #                   rownames = FALSE)
+    # )
     
     # Print data table if checked -------------------------------------
     output$datatable2 <- DT::renderDataTable(
         if(input$show_data){
-            DT::datatable(data = newdf_criteria_recode(),
+            DT::datatable(data = df(),
                           extensions = 'Buttons',
                           options = list(pageLength = 10, dom = 'B<"dwnld">frtip',
                                          buttons = list("copy")), 
@@ -652,14 +629,14 @@ server <- function(input, output, session) {
     
     
     # Download data into a csv file if button is clicked -------------------------------------
-    output$download1 <- downloadHandler(
-        filename = function() {
-            paste("data-", Sys.Date(), ".csv", sep="")
-        },
-        content = function(file) {
-            write.csv(newdf_criteria_recode(), file)
-        }
-    )
+    # output$download1 <- downloadHandler(
+    #     filename = function() {
+    #         paste("data-", Sys.Date(), ".csv", sep="")
+    #     },
+    #     content = function(file) {
+    #         write.csv(newdf_criteria_recode(), file)
+    #     }
+    # )
     
 }
 
