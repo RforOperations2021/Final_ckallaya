@@ -1,0 +1,415 @@
+---
+title: "Where are Forest-Dependent Communities?"
+output: 
+ flexdashboard::flex_dashboard:
+   orientation: columns
+runtime: shiny
+---
+
+```{r context="setup", include=FALSE}
+library(shiny)
+library(ggplot2)
+library(broom)
+library(geojsonio)
+library(dplyr)
+library(flexdashboard)
+library(tools)
+library(plotly)
+library(scales)
+library(reshape)
+library(tidyverse)
+library(leaflet)
+library(rgdal)    # for readOGR and others
+library(sp)       # for spatial objects
+library(sf) 
+library(tigris)
+library(censusapi)
+library(rgeos)
+library(GISTools)
+library(maptools)
+
+options(tigris_use_cache = TRUE)
+```
+
+```{r context="setup", include=FALSE}
+# load the data
+
+final.merged.rural <- read.csv("final.merged.rural.csv")
+
+final.merged.rural$COUNTYFP <- as.character(final.merged.rural$COUNTYFP)
+final.merged.rural$STATEFP <- as.character(final.merged.rural$STATEFP)
+
+# US Census API's
+# Add key to .Renviron
+Sys.setenv(CENSUS_KEY="815f420d7978fe1866f81df31947126f9e1cc460")
+# Reload .Renviron
+readRenviron("~/.Renviron")
+# Check to see that the expected key is output in your R console
+Sys.getenv("CENSUS_KEY")
+
+```
+
+Inputs {.sidebar}
+=======================================================================
+
+
+### Demo
+
+Data sources: <br>
+US Census API's; US Forest Service
+
+```{r context="render"}
+selectInput(inputId = "selected_state", 
+                  label = "Select State:",
+                  choices = c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"),
+                  multiple = TRUE,
+                  selected = c("PA"))
+
+# Highlight forest-dependent communities ---------------------------------------------
+            checkboxInput(inputId = "show_FDC",
+                          label = "Highlight Forest-Dependent Communities",
+                          value = TRUE)
+
+# Showing income data in the map ---------------------------------------------
+            checkboxInput(inputId = "show_income",
+                          label = "Showing Income in Map",
+                          value = TRUE)
+
+# Select Thresholds ----------------------------------------------------
+# Forest land
+numericInput(inputId = "forest_land1", 
+                         label = "Criteria 1: Spatial Relationship - Please put minimum forest land area (%)", 
+                         min = 0, max = 100, 
+                         value = 75)
+# Employees
+numericInput(inputId = "employees", 
+                         label = "Criteria 2.1: Economic Dependence - Please put minimum employees in the forest sector (%)", 
+                         min = 0, max = 100, 
+                         value = 10)
+            
+# Earnings
+numericInput(inputId = "earnings", 
+                         label = "Criteria 2.2: Economic Dependence - Please put minimum earnings from the forest sector (%)", 
+                         min = 0, max = 100, 
+                         value = 15)
+          
+# forest land
+numericInput(inputId = "forest_land2", 
+                         label = "Criteria 3.1: Cultural Connection - Please put minimum forest land area (%)", 
+                         min = 0, max = 100, 
+                         value = 30)
+            
+# indigenous
+numericInput(inputId = "indigenous", 
+                         label = "Criteria 3.2: Cultural Connection - Please put minimum indiginous population (%)", 
+                         min = 0, max = 100, 
+                         value = 5)
+
+selectInput(inputId = "selected_vintage", 
+                  label = "Select Vintage:",
+                  choices = c("2009", "2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019"),
+                  multiple = FALSE,
+                  selected = c("2019"))
+
+selectInput(inputId = "selected_varX", 
+                  label = "X-Axis:",
+                  choices = c("Population" = "B01001_001E", "Unemploy" = "B23025_005E", "Income" = "B19052_002E", "Male" = "B01001_002E", "Female" = "B01001_026E"),
+                  multiple = FALSE,
+                  selected = c("B19052_002E"))
+
+selectInput(inputId = "selected_varY", 
+                  label = "Y-Axis:",
+                  choices = c("Population" = "B01001_001E", "Unemploy" = "B23025_005E", "Income" = "B19052_002E", "Male" = "B01001_002E", "Female" = "B01001_026E"),
+                  multiple = FALSE,
+                  selected = c("B23025_005E"))
+
+selectInput(inputId = "selected_varZ", 
+                  label = "Bubble Size:",
+                  choices = c("Population" = "B01001_001E", "Unemploy" = "B23025_005E", "Income" = "B19052_002E", "Male" = "B01001_002E", "Female" = "B01001_026E"),
+                  multiple = FALSE,
+                  selected = c("B01001_001E"))
+
+selectInput(inputId = "selected_varA", 
+                  label = "Scatter Plot:",
+                  choices = c("Population" = "B01001_001E", "Unemploy" = "B23025_005E", "Income" = "B19052_002E", "Male" = "B01001_002E", "Female" = "B01001_026E"),
+                  multiple = FALSE,
+                  selected = c("B01001_002E"))
+
+selectInput(inputId = "selected_varB", 
+                  label = "Average Value:",
+                  choices = c("Population" = "B01001_001E", "Unemploy" = "B23025_005E", "Income" = "B19052_002E", "Male" = "B01001_002E", "Female" = "B01001_026E"),
+                  multiple = FALSE,
+                  selected = c("B01001_026E"))
+
+# Forest land 1
+observe({
+        updateNumericInput(session,
+                           inputId = "forest_land1",
+                           value = min(75, 100),
+                           max = 100
+        )
+    })
+
+# Employees
+observe({
+        updateNumericInput(session,
+                           inputId = "employees",
+                           value = min(10, 100),
+                           max = 100
+        )
+    })
+
+# Earnings
+observe({
+    updateNumericInput(session,
+                       inputId = "earnings",
+                       value = min(15, 100),
+                       max = 100
+    )
+})
+
+# Forest land 2
+observe({
+    updateNumericInput(session,
+                       inputId = "forest_land2",
+                       value = min(30, 100),
+                       max = 100
+    )
+})
+
+# Indigenous
+observe({
+    updateNumericInput(session,
+                       inputId = "indigenous",
+                       value = min(5, 100),
+                       max = 100
+    )
+})
+
+forest.dependent <- reactive({
+    ifelse(final.merged.rural$pct.forest > input$forest_land1 |
+               (final.merged.rural$pct.employees > input$employees | final.merged.rural$pct.earnings > input$earnings) |
+               (final.merged.rural$pct.forest > input$forest_land2 & final.merged.rural$pct.indigenous > input$indigenous), 1, 0)
+})
+
+other.rural <- reactive({
+    ifelse(final.merged.rural$nonmetro == 1 & forest.dependent() == 0, 1,
+           ifelse(is.na(final.merged.rural$nonmetro) | is.na(forest.dependent()), 0, 0))
+})
+
+non.forest.dependent <- reactive({
+    ifelse(forest.dependent() == 0 & final.merged.rural$nonmetro == 0, 1,
+           ifelse(is.na(forest.dependent()) | is.na(final.merged.rural$nonmetro), 0, 0))
+})
+
+df <- reactive({
+        cbind(
+            final.merged.rural,
+            other.rural(),
+            non.forest.dependent(),
+            forest.dependent()
+        )
+})
+
+#Assign 3 categories: Forest-dependent counties (1), Non-metro, non-forest counties (2), and Metro, non-forest counties (3).
+observe({
+    updateNumericInput(session,
+                       inputId = "indigenous",
+                       value = min(5, 100),
+                       max = 100
+    )
+})
+
+forest.dependent_recode <- reactive({
+        recode_factor(forest.dependent(),
+                      `1` = "FDC",
+                      `0` = "NFDC")
+})
+
+newdf <- reactive({
+        cbind(
+            final.merged.rural[,!(names(final.merged.rural) %in% c("nonmetro", "rural"))],
+            "community_type" = forest.dependent_recode()
+        )
+})
+
+select_newdf <- reactive({filter(newdf(), state_abb %in% input$selected_state)
+                })
+
+forest.dependent.sum <- reactive({
+        sum(select_newdf()$community_type == "FDC")
+})
+    
+non.forest.sum <- reactive({
+        sum(select_newdf()$community_type == "NFDC")
+})  
+    
+    
+total <- reactive({
+        forest.dependent.sum()+non.forest.sum()
+}) 
+
+```
+
+
+State-Focus Map
+=======================================================================
+
+Row 
+-----------------------------------------------------------------------
+
+```{r}
+
+shapefile <- reactive({tigris::counties(state = input$selected_state, class = "sf")
+              })
+
+shape_join <- reactive({
+              join <- geo_join(shapefile(), select_newdf(), by = "COUNTYFP", "STATEFP")
+              return(join)
+              })
+
+centroids <- reactive({st_centroid(shapefile())
+              })
+
+centroids_newdf <- reactive({
+              join <- geo_join(centroids(), select_newdf(), by = "COUNTYFP", "STATEFP")
+              return(join)
+              })
+
+output$map1 <- renderLeaflet({
+    leaflet() %>%
+      addProviderTiles("CartoDB.Positron") %>%
+      addPolygons(data = shape_join(),
+                  fillColor = "white",
+                  color = "grey", weight = 1,
+                  layerId = ~COUNTYNS)
+})
+
+leafletOutput('map1')
+
+
+observeEvent(input$show_FDC, {
+    if(input$show_FDC){
+      leafletProxy("map1", data=shape_join()) %>%
+        addPolygons(data = shape_join(),
+                  fillColor = ~community_type,
+                  color = "forestgreen", weight = 1,
+                  layerId = ~COUNTYNS)
+      }
+
+})
+
+observeEvent(input$show_income, {
+     if(input$show_income){
+       leafletProxy("map1", data=centroids_newdf()) %>%
+         addCircleMarkers(
+                  radius = ~pct.earnings,
+                  fill = FALSE,
+                  layerId = ~COUNTYNS)
+       }
+
+})
+
+```
+
+
+### Summary
+
+```{r}
+renderUI({
+        HTML(paste("In the selected state(s), there are ", forest.dependent.sum(), "counties (", round(forest.dependent.sum()/total()*100,0)," percent ) that are categorized as forest-dependent and", non.forest.sum(), "counties (", round(non.forest.sum()/total()*100,0)," percent ) that are categorized as non-forest dependent."))
+    })
+```
+
+Plots
+=======================================================================
+
+Row 
+-----------------------------------------------------------------------
+
+### 3-Dimensional Plot
+
+```{r}
+# Accessing Census API's
+
+acs <- reactive({getCensus(name = "acs/acs5",
+                  vintage = input$selected_vintage,
+                  vars = c(input$selected_varX, input$selected_varY, input$selected_varZ, input$selected_varA, input$selected_varB),
+                  region = "county:*")})
+
+    
+fcd_acs <- reactive({inner_join(newdf(),acs(), by = c("STATEFP" = "state", "COUNTYFP" = "county"))})
+
+renderPlotly({
+  ggplotly(
+    ggplot(data = fcd_acs(), aes_string(x = input$selected_varX, y = input$selected_varY, size = input$selected_varZ)) +
+      geom_point(alpha = 0.5) + scale_size(range = c(.1, 5))+
+      labs(x = " ",
+           y = " ") + facet_wrap(~fcd_acs()$"community_type") +theme(axis.text.x = element_text(angle = 90))
+  )
+  })
+```
+
+Row 
+-----------------------------------------------------------------------
+
+### Scatter Plot
+
+```{r}
+renderPlotly({
+  ggplotly(
+    ggplot() +
+      geom_point(data = fcd_acs(), aes_string(x = fcd_acs()$"community_type", y = input$selected_varA))
+      +
+      labs(x = " ",
+           y = " ")) 
+  })
+
+```
+
+### Average Value
+
+```{r}
+renderPlotly({
+  ggplotly(
+    ggplot(data = fcd_acs(), aes_string(x =fcd_acs()$"community_type", y = input$selected_varB)) +
+      geom_bar(position = "dodge", stat="summary", fun.y = "mean") +
+      labs(x = " ",
+           y = " ")
+  )
+  })
+```
+
+
+Data Table
+=======================================================================
+
+Column {.tabset}
+-------------------------------------
+
+### Forest-Dependent Community Details
+
+```{r}
+
+downloadHandler(
+    filename = function() {
+      paste("data-", Sys.Date(), ".csv", sep="")
+    },
+    content = function(file) {
+      write.csv(select_newdf(), file)
+    }
+  )
+
+downloadButton("Download data table as csv")
+
+DT::renderDataTable(
+            DT::datatable(data = select_newdf(),
+                          extensions = 'Buttons',
+                          options = list(pageLength = 10, dom = 'B<"dwnld">frtip',
+                                         buttons = list("copy")),
+                          rownames = FALSE)
+
+    )
+  
+```
+
