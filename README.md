@@ -9,3 +9,5 @@ Users can adjust the criteria regarding to the Spatial relationship, Economic de
 After the forest-dependent communities are identified, we can monitor their macro-economic conditions i.e. number of population, income, unemployment, etc.
 
 Users can download the data into their own local computer.
+
+Note: Please be patient, it may take a while for the map to fully updated the input.
