@@ -59,6 +59,7 @@ Data sources: <br>
 US Census API's; US Forest Service
 
 ```{r context="render"}
+
 selectInput(inputId = "selected_state", 
                   label = "Select State:",
                   choices = c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"),
@@ -259,23 +260,26 @@ Row
 -----------------------------------------------------------------------
 
 ```{r}
-
+#loading county level map (class sf) from tigris
 shapefile <- reactive({tigris::counties(state = input$selected_state, class = "sf")
               })
 
+#join the county level map with the forest-dependent community dataset
 shape_join <- reactive({
               join <- geo_join(shapefile(), select_newdf(), by = "COUNTYFP", "STATEFP")
               return(join)
               })
 
+#calculate centroids for addCircleMarker
 centroids <- reactive({st_centroid(shapefile())
               })
 
+#join centroids with forest-dependent dataset
 centroids_newdf <- reactive({
               join <- geo_join(centroids(), select_newdf(), by = "COUNTYFP", "STATEFP")
               return(join)
               })
-
+#create a base map
 output$map1 <- renderLeaflet({
     leaflet() %>%
       addProviderTiles("CartoDB.Positron") %>%
@@ -287,19 +291,20 @@ output$map1 <- renderLeaflet({
 
 leafletOutput('map1')
 
-
-observeEvent(input$show_FDC, {
+#create polygons showing locations of forest-dependent communities if user click
+observeEvent(input$selected_state, {
     if(input$show_FDC){
       leafletProxy("map1", data=shape_join()) %>%
         addPolygons(data = shape_join(),
-                  fillColor = ~community_type,
-                  color = "forestgreen", weight = 1,
+                  fillColor = ~community_type, stroke = TRUE,
+                  color = "white", weight = 1,
                   layerId = ~COUNTYNS)
       }
 
 })
 
-observeEvent(input$show_income, {
+#creater circle market showing earnings (based on the size of the circle) if user click
+observeEvent(input$selected_state, {
      if(input$show_income){
        leafletProxy("map1", data=centroids_newdf()) %>%
          addCircleMarkers(
@@ -316,6 +321,7 @@ observeEvent(input$show_income, {
 ### Summary
 
 ```{r}
+# summary how many county for each type of community
 renderUI({
         HTML(paste("In the selected state(s), there are ", forest.dependent.sum(), "counties (", round(forest.dependent.sum()/total()*100,0)," percent ) that are categorized as forest-dependent and", non.forest.sum(), "counties (", round(non.forest.sum()/total()*100,0)," percent ) that are categorized as non-forest dependent."))
     })
@@ -338,14 +344,15 @@ acs <- reactive({getCensus(name = "acs/acs5",
                   region = "county:*")})
 
     
-fcd_acs <- reactive({inner_join(newdf(),acs(), by = c("STATEFP" = "state", "COUNTYFP" = "county"))})
+fdc_acs <- reactive({inner_join(newdf(),acs(), by = c("STATEFP" = "state", "COUNTYFP" = "county"))})
 
+# 3-dimensional plot
 renderPlotly({
   ggplotly(
-    ggplot(data = fcd_acs(), aes_string(x = input$selected_varX, y = input$selected_varY, size = input$selected_varZ)) +
+    ggplot(data = fdc_acs(), aes_string(x = input$selected_varX, y = input$selected_varY, size = input$selected_varZ)) +
       geom_point(alpha = 0.5) + scale_size(range = c(.1, 5))+
       labs(x = " ",
-           y = " ") + facet_wrap(~fcd_acs()$"community_type") +theme(axis.text.x = element_text(angle = 90))
+           y = " ") + facet_wrap(~fdc_acs()$"community_type") +theme(axis.text.x = element_text(angle = 90))
   )
   })
 ```
@@ -359,7 +366,7 @@ Row
 renderPlotly({
   ggplotly(
     ggplot() +
-      geom_point(data = fcd_acs(), aes_string(x = fcd_acs()$"community_type", y = input$selected_varA))
+      geom_point(data = fdc_acs(), aes_string(x = fdc_acs()$"community_type", y = input$selected_varA))
       +
       labs(x = " ",
            y = " ")) 
@@ -372,7 +379,7 @@ renderPlotly({
 ```{r}
 renderPlotly({
   ggplotly(
-    ggplot(data = fcd_acs(), aes_string(x =fcd_acs()$"community_type", y = input$selected_varB)) +
+    ggplot(data = fdc_acs(), aes_string(x =fdc_acs()$"community_type", y = input$selected_varB)) +
       geom_bar(position = "dodge", stat="summary", fun.y = "mean") +
       labs(x = " ",
            y = " ")
